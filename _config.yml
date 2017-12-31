@@ -28,6 +28,8 @@ plugins:
 disqus:
     shortname: brunodmt
 
+google_analytics: UA-46122326-1
+
 # Exclude from processing.
 # The following items will not be processed, by default. Create a custom list
 # to override the default setting.
