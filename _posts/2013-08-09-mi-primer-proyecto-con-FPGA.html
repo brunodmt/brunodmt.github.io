@@ -1,0 +1,42 @@
+---
+layout: post
+status: publish
+published: true
+title: "Mi Primer Proyecto con FPGA"
+date: '2013-08-09 14:35:11 -0300'
+date_gmt: '2013-08-09 17:35:11 -0300'
+categories:
+- FPGA
+tags:
+- FPGA
+- Nanoboard 3000
+- Xilinx Spartan
+comments: []
+---
+<p>Recientemente obtuve una placa de desarrollo FPGA para empezar a aprender y desarrollar algunos proyectos. La placa es una <a title="Nanoboard 3000" href="http://wiki.altium.com/display/ADOH/NanoBoard+3000+Series">Nanoboard 3000</a> con un <a title="Xilinx Spartan-3AN" href="http://http://wiki.altium.com/display/ADOH/XC3S1400AN-4FGG676C+-+Feature+Summary">Xilinx Spartan-3AN</a>, tiene muchos complementos pero para este primer ejemplo solo voy a usar un pulsador y los LEDs RGB de usuario.</p>
+<p><strong>FPGqu&eacute;?</strong></p>
+<p>Si no sabes nada acerca de FPGAs te recomiendo que investigues un poco antes de leer este art&iacute;&shy;culo. En una oraci&oacute;n, un FPGA es hardware programable, no software corriendo sobre un hardware, sino diferentes bloques de hardware que se recombinan de acuerdo a tu programa. Por supuesto hay muchas webs con explicaciones mejores y m&aacute;s precisas, si te interesan los FPGA deber&iacute;&shy;as leerlas.</p>
+<p><strong>El Proyecto<br />
+</strong></p>
+<p>El proyecto propuesto es muy simple, usar un pulsador para prender y apagar un LED. La idea es que cada vez que se presiona el bot&oacute;n el LED cambie de estado, si estaba apagado se prenda, si estaba prendido se apague. Nada deber&iacute;&shy;a pasar si el bot&oacute;n se mantiene apretado o cuando se lo suelta, el &uacute;nico evento que importa es cuando se presiona. En realidad, simple es de describir, pero la implementaci&oacute;n tiene sus vueltas. Los lenguajes m&aacute;s comunes para la programaci&oacute;n de FPGAs son Verilog y VHDL, pero como todav&iacute;a estoy aprendiendo y no pod&iacute;a esperar para probar mi placa utilic&eacute; lo que se: Esquemas (Schematics)</p>
+<p><strong>Una Primera Aproximaci&oacute;n: Un Biestable T<br />
+</strong></p>
+<p>Primero, en caso de que no lo sepas, un Biestable (o Flip-Flop) es un circuito bi-estable, es decir puede estar en dos estados (generalmente considerados como 0 y 1 o Bajo y Alto). Esta propiedad los hace &uacute;tiles como memorias de un bit, donde se puede guardar un valor l&oacute;gico para su uso futuro. Perfecto!, utilicemos un Biestable para mantener el estado del LED: cuando el Biestable tiene un 1 en su salida, el LED estar&aacute; prendido, cuando tiene un 0, el LED estar&aacute; apagado. Pero hay varios tipos de Biestable, cu&aacute;l utilizamos? En este caso podemos utilizar un Biestable T, donde T viene de <em>toggle</em> (conmutar, alternar). Su nombre descibre su funcionamiento, siempre que haya un uno en la entrada del Biestable T cambiar&aacute; de estado, pasando de un 0 a un 1 o de un 1 a un 0 dependiendo su estado previo.</p>
+<p>Entonces la operaci&oacute;n b&aacute;sica ser&iacute;a que siempre que se pulse el bot&oacute;n el Biestable recibir&aacute; un 1 en su entrada y alternar&aacute; de estado, cambiando el estado del LED. Es un poco m&aacute;s f&aacute;cil entenderlo viendo el esquema:</p>
+<p><a href="/assets//Sch1.png"><img class="aligncenter size-full wp-image-45" alt="FPGA First Project: First Approach" src="/assets/Sch1.png" width="920" height="184" /></a></p>
+<p>Explicar&eacute; brevemente el esquema de izquierda a derecha. Primero est&aacute;n las dos entradas, el pulsador (SW_USER0) y el reloj de la placa (CLK_BRD), necesario para el Biestable. Luego est&aacute; el Biestable T, con su entrada T conectada el pulsador, su entrada de reloj conectada al reloj de la placa, una entrada Clear (CLR, borrar) conectada a tierra ya que no la necesitamos por ahora, y su salida Q. Lo que sigue es un Bus Joiner (Uni&oacute;n de Bus). Es necesaria ya que la placa tiene 8 LEDs controlados por un bus de 8-bits (un bit por cada LED), de manera que la salida del Biestable de un bit se conecta a<em> </em>cada bit de dicho bus utilizando el <em>bus joiner</em> (en este ejemplo controlaremos los 8 LEDs juntos). Finalmente est&aacute;n los LEDs. Las entradas LED_G y LED_B estan conectadas a tierra ya que son LEDs RGB y en este momento solo interesa el color rojo.</p>
+<p>Listo, a probarlo.</p>
+<p>Funciona... MAL, muy mal, totalmente aleatorio. Qu&eacute; pas&oacute;? Tomate tu tiempo para analizar el circuito y tratar de descubrir el problema vos mismo. La soluci&oacute;n en el pr&oacute;ximo p&aacute;rrafo, no hagas trampa!</p>
+<p>Bueno, el problema es realmente simple (simple de darse cuenta una vez que cometiste el error). El Biestable T cambia su estado siempre que tenga un 1 en su entrada, con CADA pulso de reloj. El reloj de la placa por defecto funciona a 50MHz, es decir hay un pulso cada 20ns. No hay forma de presionar y soltar el bot&oacute;n en 20ns, por lo que cada vez que lo aprientes habr&aacute; m&aacute;s de un pulso, o peor, un n&uacute;mero desconocido de pulsos, dejando el Biestable en cualquier estado menos el deseado.</p>
+<p><strong>La Soluci&oacute;n Final: El Biestable D<br />
+</strong></p>
+<p>Ya encontramos el problema pero... c&oacute;mo lo resolvemos? El truco es que no deber&iacute;amos cambiar el estado del Biestable cada vez que el bot&oacute;n da como salida un 1. En cambio, solo deber&iacute;&shy;amos alternarlo cuando el bot&oacute;n reci&eacute;n fue presionado, o m&aacute;s precisamente, cuando la salida del bot&oacute;n cambia de 0 a 1. Para detectar esta transici&oacute;n no solo necesitamos el estado actual del bot&oacute;n sino que debemos recordar el estado previo, necesitamos entonces memoria. Memoria... memoria? qu&eacute; utiliz&aacute;bamos como memoria?</p>
+<p>Si, necesitamos otro Biestable. En este caso utilizamos un Biestable D, con d de <em>delay </em>(retardo). Su comportamiento es muy simple, simplemente da como salida la entrada. &iquest;C&oacute;mo es &uacute;til &eacute;sto? Porque solo cambia con un pulso de reloj, manteniendo como salida la entrada previa, no la actual, hasta el pr&oacute;ximo pulso. Entonces si en el pulso de reloj previo hab&iacute;&shy;a un 0 y ahora hay un 1 en la entrada, la salida del Biestable permanecer&aacute; 0 hasta el pr&oacute;ximo pulso, justo lo que necesitabamos.</p>
+<p>Como dije antes, s&oacute;lo necesitamos cambiar el estado del Biestable T si hubo un cambio de 0 a 1 en el pulsador. El estado actual se obtiene directamente del bot&oacute;n, mientras que el estado anterior se obtiene del Biestable D. Todo lo que neceistamos es una compuerta AND con una entrada negada, de manera que solo de como salida 1 cuando el bot&oacute;n est&aacute; en 1 y el Biestable D en 0. El resto del circuito se mantiene, dando como resultado el siguiente esquema:</p>
+<p><a href="/assets/Sch2.png"><img class="aligncenter size-large wp-image-51" alt="FPGA First Project: Final Solution" src="/assets/Sch2.png" /></a></p>
+<p><strong>El Resultado<br />
+</strong></p>
+<p>Un breve video para mostrar su funcionamiento</p>
+<p><iframe src="//www.youtube.com/embed/5oXZfsLm6JI?rel=0" height="315" width="420" allowfullscreen="" frameborder="0"></iframe></p>
+<p>Espero te haya gustado el tutorial, si te qued&oacute; alguna duda o ten&eacute;s alguna sugerencia hac&eacute;melo saber. Voy a tratar de seguir escribiendo art&iacute;&shy;culos a medida que aprenda m&aacute;s sobre los FPGAs.</p>
+<p>El proyecto fue desarrollado utilizando Altium Designer. Pod&eacute;s bajar los archivos y jugar con ellos desde <a title="Github FPGAPushbuttonLED" href="https://github.com/brunodmt/FPGAPushubuttonLED">Github</a></p>

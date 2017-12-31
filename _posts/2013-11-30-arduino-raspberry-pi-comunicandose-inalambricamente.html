@@ -1,0 +1,269 @@
+---
+layout: post
+status: publish
+published: true
+title: "Arduino & Raspberry Pi comunicándose inalámbricamente [Parte 1]"
+date: '2013-11-30 19:08:06 -0300'
+date_gmt: '2013-11-30 22:08:06 -0300'
+categories:
+- Arduino
+- Raspberry Pi
+tags:
+- Arduino
+- Raspberry Pi
+- nRF24L01+
+- wireless
+- rf
+- communication
+comments:
+- id: 5137
+  author: Erwan
+  author_email: erwan@failbone.com
+  author_url: ''
+  date: '2016-01-28 01:59:46 -0300'
+  date_gmt: '2016-01-28 04:59:46 -0300'
+  content: Dude you should finish this and post part 2
+- id: 5261
+  author: bdemartino
+  author_email: demartinoba@gmail.com
+  author_url: http://blog.brunodemartino.com.ar
+  date: '2016-03-22 22:40:34 -0300'
+  date_gmt: '2016-03-23 01:40:34 -0300'
+  content: Thanks for the comment! Here is part 2 http://blog.brunodemartino.com.ar/2016/03/arduino-raspberry-pi-talking-wirelessly-part-2/
+    (and this part has been updated).
+- id: 5262
+  author: Arduino &#038; Raspberry Pi talking wirelessly [Part 2] | Bruno Demartino
+  author_email: ''
+  author_url: http://blog.brunodemartino.com.ar/2016/03/arduino-raspberry-pi-talking-wirelessly-part-2/
+  date: '2016-03-22 22:41:41 -0300'
+  date_gmt: '2016-03-23 01:41:41 -0300'
+  content: "[&#8230;] is the second part of my last post. In case you haven&#8217;t
+    read it yet, I suggest you do it before reading this one. If you [&#8230;]"
+---
+<p>En esta gu&iacute;a voy a explicar como comunicar un Arduino y un Raspberry Pi con modulos nRF24L01+. Encontr&eacute; en Internet varias gu&iacute;as para hacerlo, pero ninguna estaba completa o me funcion&oacute; completamente, entonces decid&iacute; registrar lo que hice por si lo necesito nuevamente. Esta parte tiene una introducci&oacute;n y explica como preparar el Arduino, mientras que en la parte 2 explicar&eacute; como preprar el Raspberry Pi y probar todo.</p>
+<p><strong>nRF24L01+</strong></p>
+<p>Como dije, voy a usar m&oacute;dulos basados en el chip <a href="http://www.nordicsemi.com/eng/Products/2.4GHz-RF/nRF24L01P">nRF24L01+</a> de Nordic Semiconductors. La raz&oacute;n para elegirlos sobre otras alternativas es que siendo baratos no dejan de incluir ciertas caracter&iacute;sticas no encontradas en los m&oacute;dulos m&aacute;s baratos, como ser m&uacute;ltiples <em>pipelines</em>, <em>buffers</em> y auto retransmisi&oacute;n. En este caso uno de los m&oacute;dulos es uno com&uacute;n (el de la izquierda) y el otro tiene circuitos amplificadores (LNA, low noise amplifier, y PA, power amplifier) para mejorar el alcance (el de la derecha). Ambos son de&nbsp;<a href="http://blog.iteadstudio.com/">Itead Studio</a>.</p>
+<p><figure>
+<a href="/assets/Modules.png"><img class="size-large wp-image-95" alt="nRF24L01+" src="/assets/Modules.png" /></a>
+<figcaption>m&oacute;dulo nRF24L01+ (izquierda) y m&oacute;dulo nRF24L01+ con PA y LNA (derecha)</figcaption>
+</figure></p>
+<p><strong>SPI<br />
+</strong></p>
+<p>Para interactuar con estos m&oacute;dulos tenemos que usar el bus <a href="http://es.wikipedia.org/wiki/Serial_Peripheral_Interface">SPI</a>. SPI es una interfaz serie (Seria Peripheral Interface) que trabaja en un esquema maestro/esclavo. El bus SPI puede operar con un s&oacute;lo dispositivo maestro y uno o m&aacute;s dispositivos esclavos. Utiliza tres cables comunes y uno extra por cada dispositivo esclavo. Los tres cables comunes (conectados a todos los dispositivos) son:</p>
+<ul>
+<li>SCK: se&ntilde;al de reloj (salida desde el maestro)</li>
+<li>MOSI: salida de maestro - entrada a esclavo</li>
+<li>MISO: entrada a maestro - salida de esclavo</li>
+</ul>
+<p>El cable extra es conocido como SS (slave select, selecci&oacute;n de esclavo) o CS (chip select, selecci&oacute;n de chip) y su funci&oacute;n es habilitar el dispositivo esclavo con el que nos queremos comunicar (solo un esclavo puede ser habilitado a la vez). Si quer&eacute;s saber m&aacute;s sobre SPI y como funciona pod&eacute;s ir a <a href="http://es.wikipedia.org/wiki/Serial_Peripheral_Interface">Wikipedia</a>. En este caso utilizaremos solo uno, pero en la imagen podes ver un esquema con m&uacute;ltiples esclavos.</p>
+<p><figure>
+<a href="/assets/363px-SPI_three_slaves.svg_.png"><img class="size-full wp-image-97" alt="Typical SPI bus: master and three independent slaves. [Wikipedia]" src="/assets/363px-SPI_three_slaves.svg_.png" width="363" height="288" /></a>
+<figcaption>Bus SPI tipico: maestro y tres esclavos independientes. [Wikipedia]</figcaption>
+</figure></p>
+<p><strong>Preparando el Arduino<br /></strong></p>
+<p>Empezaremos preparando el Arduino porque es la parte m&aacute;s f&aacute;cil. Estas instrucciones son para el Arduino ADK (tambi&eacute;n funcionan para el Arduino Mega 2560). Pod&eacute;s usarlas para cualquier Arduino, pero ten&eacute; en cuenta que las conexiones de SPI generalmente varian. Si buscas tu modelo de Arduino en la p&aacute;gina web vas a encontrar que pines tenes que usar para SPI. Las conexiones necesarias est&aacute;n resumidas en la tabla siguiente.</p>
+<table border="1" cellspacing="0" cellpadding="0">
+<tbody>
+<tr>
+<td valign="top" width="110">
+<p align="center"><b>Pin nRF24L01+ Pin</b></p>
+</td>
+<td valign="top" width="92">
+<p align="center"><b>Se&ntilde;al</b></p>
+</td>
+<td valign="top" width="94">
+<p align="center"><b>Pin Arduino<br />
+</b></p>
+</td>
+<td valign="top" width="94">
+<p align="center"><b>Color del Cable (s&oacute;lo referencia)<br />
+</b></p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">1</p>
+</td>
+<td valign="top" width="92">
+<p align="center">GND</p>
+</td>
+<td valign="top" width="94">
+<p align="center">GND</p>
+</td>
+<td valign="top" width="94">
+<p style="background: black; color: white;" align="center">Negro</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">2</p>
+</td>
+<td valign="top" width="92">
+<p align="center">3V3</p>
+</td>
+<td valign="top" width="94">
+<p align="center">3V3</p>
+</td>
+<td valign="top" width="94">
+<p style="background: red; color: white;" align="center">Rojo</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">3</p>
+</td>
+<td valign="top" width="92">
+<p align="center">CE</p>
+</td>
+<td valign="top" width="94">
+<p align="center">9</p>
+</td>
+<td valign="top" width="94">
+<p style="background: yellow; color: black;" align="center">Amarillo</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">4</p>
+</td>
+<td valign="top" width="92">
+<p align="center">CSN (SPI)</p>
+</td>
+<td valign="top" width="94">
+<p align="center">10</p>
+</td>
+<td valign="top" width="94">
+<p style="background: blue; color: white;" align="center">Azul</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">5</p>
+</td>
+<td valign="top" width="92">
+<p align="center">SCK (SPI)</p>
+</td>
+<td valign="top" width="94">
+<p align="center">52 (SCK)</p>
+</td>
+<td valign="top" width="94">
+<p style="background: brown; color: white;" align="center">Marr&oacute;n</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">6</p>
+</td>
+<td valign="top" width="92">
+<p align="center">MOSI (SPI)</p>
+</td>
+<td valign="top" width="94">
+<p align="center">51 (MOSI)</p>
+</td>
+<td valign="top" width="94">
+<p style="background: green; color: white;" align="center">Verde</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">7</p>
+</td>
+<td valign="top" width="92">
+<p align="center">MISO (SPI)</p>
+</td>
+<td valign="top" width="94">
+<p align="center">50 (MISO)</p>
+</td>
+<td valign="top" width="94">
+<p style="color: black;" align="center">Blanco</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">8</p>
+</td>
+<td valign="top" width="92">
+<p align="center">Interrupci&oacute;n</p>
+</td>
+<td valign="top" width="94">
+<p align="center">-</p>
+</td>
+<td>
+<p align="center">-</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Deber&iacute;as tener en cuenta algunas cosas:</p>
+<ul>
+<li>El m&oacute;dulo trabaja con 3.3V, as&iacute; que ten&eacute;s que conectarlo a esa l&iacute;nea y NO a los 5v</li>
+<li>El m&oacute;dulo usa un cable extra para "datos" adem&aacute;s de los de SPI (CE: Chip Enable, habilitaci&oacute;n de chip)</li>
+<li>La librer&iacute;a no utiliza el pin SS del Arduino, si no que un pin digital regular como SS</li>
+<li>Ambas conexiones (CE y SS) se definen al inicializar la librer&iacute;a y pueden ser modificadas</li>
+<li>Las conexiones SCK, MOSI y MISO dependen del Arduino, por lo que estar&aacute;n en pines diferentes si usas otro modelo</li>
+<li>El octavo pin del m&oacute;dulo es para interrupciones y no se usa actualmente en la librer&iacute;a</li>
+</ul>
+<p>En caso de que te sea m&aacute;s f&aacute;cil verlo gr&aacute;ficamente, hice una imagen en Fritzing:</p>
+<p><figure>
+<a href="/assets/connections.png"><img class="size-large wp-image-104" alt="Arduino - nRF24L01+ Connections" src="/assets/connections.png" /></a>
+<figcaption>Conexi&oacute;n Arduino - nRF24L01+ (No est&aacute; en escala)</figcaption>
+</figure></p>
+<p>Si pens&aacute;s usar un breadboard vas a tener que hacer un adaptador (si ten&eacute;s un breadboard com&uacute;n, no hay forma de conectar el m&oacute;dulo directamente sin que queden conectados dos pines)</p>
+<p><strong>Etapa de programaci&oacute;n<br />
+</strong></p>
+<p>Entonces todo est&aacute; listo y es momento de programar el Arduino. Hay varias librer&iacute;as para estos m&oacute;dulos, yo utilic&eacute; la <a href="https://github.com/maniacbug/RF24">RF24</a> de <a href="http://maniacbug.wordpress.com/">maniacbug</a>. Si explor&aacute;s un poco la <a href="https://github.com/maniacbug/RF24/network">red</a> de este repositorio vas a ver que hay un mont&oacute;n de <em>forks</em>, sin embargo no pude encontrar una diferencia relevante entre ellos (no es que haya buscado mucho). Como con cualquier librer&iacute;a de Arduino, simplemente clon&aacute; el repo de Github o baj&aacute; el <a href="https://github.com/maniacbug/RF24/archive/master.zip">zip </a>e instalalo. Si, como yo, bajaste la versi&oacute;n zip de la IDE de Arduino, simplemente descomprim&iacute; la carpeta RF24-master (la de adentro del zip, no el zip en si) en la carpeta "libraries" de tu IDE y renombrala a RF24. En cualquier otro caso, o si estas instrucciones no te funcionan, <a title="Installing additional Arduino Libraries" href="http://arduino.cc/en/Guide/Libraries">ac&aacute; </a>hay instrucciones m&aacute;s detalladas.</p>
+<p>Ya est&aacute; todo listo, abr&iacute; tu IDE Arduino y and&aacute; a <strong>Archivo </strong>> <strong>Ejemplos </strong>> <strong>RF24</strong> > <strong>pingpair</strong> y cargalo a tu Arduino. Si le&iacute;ste un poco el sketch vas a haber notado que el pin 7 controla el rol del Arduino. Si se deja desconectado el Arduino entra al rol "pong back", en el que espera un mensaje y lo env&iacute;a de vuelta al recibirlo. Si el pin se conecta a la tierra (ground), el Arduino entra al rol "ping out", en el cual env&iacute;a paquetes constantemente y espera su confirmaci&oacute;n. Ten&eacute; en cuenta que el Arduino no cambia su rol mientras est&aacute; encendido, vas a tener que resetearlo si cambias el estado del pin.Ahora comprobaremos que la comunicaci&oacute;n con el m&oacute;dulo funciona correctamente (la del bus SPI, no la comunicaci&oacute;n inal&aacute;mbrica con otro m&oacute;dulo). Para eso abr&iacute; el Monitor Serie de la IDE (o cualquier terminal serie que te guste) y configurala en 57600 baudios. Si el Arduino est&aacute; en el rol pong deber&iacute;as ver algo as&iacute;:</p>
+<p>
+{% highlight bash %}
+RF24/examples/pingpair/
+ROLE: Pong back
+STATUS = 0x0e RX_DR=0 TX_DS=0 MAX_RT=0 RX_P_NO=7 TX_FULL=0
+RX_ADDR_P0-1 = 0xf0f0f0f0d2 0xf0f0f0f0e1
+RX_ADDR_P2-5 = 0xc3 0xc4 0xc5 0xc6
+TX_ADDR = 0xf0f0f0f0d2
+RX_PW_P0-6 = 0x08 0x08 0x00 0x00 0x00 0x00
+EN_AA = 0x3f
+EN_RXADDR = 0x03
+RF_CH = 0x4c
+RF_SETUP = 0x07
+CONFIG = 0x0f
+DYNPD/FEATURE = 0x00 0x00
+Data Rate = 1MBPS
+Model = nRF24L01+
+CRC Length = 16 bits
+PA Power = PA_HIGH
+{% endhighlight %}
+</p>
+<p>Si en cambio recibis todos ceros pod&eacute;s tener algo mal conectado o tu m&oacute;dulo no funciona correctamente (en general ser&aacute; la primer opci&oacute;n). Si esto pasa control&aacute; que hayas conectado todo bien y prob&aacute; de nuevo.</p>
+<p>
+{% highlight bash %}
+RF24/examples/pingpair/
+ROLE: Pong back
+STATUS = 0x00 RX_DR=0 TX_DS=0 MAX_RT=0 RX_P_NO=0 TX_FULL=0
+RX_ADDR_P0-1 = 0x0000000000 0x0000000000
+RX_ADDR_P2-5 = 0x00 0x00 0x00 0x00
+TX_ADDR = 0x0000000000
+RX_PW_P0-6 = 0x00 0x00 0x00 0x00 0x00 0x00
+EN_AA = 0x00
+EN_RXADDR = 0x00
+RF_CH = 0x00
+RF_SETUP = 0x00
+CONFIG = 0x00
+DYNPD/FEATURE = 0x00 0x00
+Data Rate = 1MBPS
+Model = nRF24L01
+CRC Length = Disabled
+PA Power = PA_MIN
+{% endhighlight %}<br />
+Una vez que el m&oacute;dulo esta respondiendo bien estamos listos para probar la comunicaci&oacute;n inal&aacute;mbrica. Bueno, hay un problema reci&eacute;n preparamos un dispositivo, el otro ser&aacute; el Raspberry Pi que configuraremos en la siguiente parte, as&iacute; que habr&aacute; que esperar hasta entonces para probar la comunicaci&oacute;n entre m&oacute;dulos. Si ten&eacute;s otro Arduino y no pod&eacute;s esperar, pod&eacute;s repetir el proceso, poner un Arduino en cada rol y probarlos.</p>
+<p>De todas maneras, estate listo para la siguiente parte ya que la configuraci&oacute;n del Raspberry Pi es un poco m&aacute;s compleja. Para concluir, algunos links &uacute;tiles (algunos ya estan en el post, otros son nuevos):</p>
+<ul>
+<li><a href="http://www.nordicsemi.com/eng/Products/2.4GHz-RF/nRF24L01P">nRF24L01+ Product Page</a></li>
+<li><a href="http://imall.iteadstudio.com/wireless/im120606002.html">Itead Studio's nRF24Lo1 Module</a></li>
+<li><a href="http://imall.iteadstudio.com/wireless/im120606003.html">Itead Studio's nRF24Lo1 with PA and LNA Module</a></li>
+<li><a href="http://es.wikipedia.org/wiki/Serial_Peripheral_Interface">[Wikipedia] Serial Peripheral Interface</a></li>
+<li><a href="https://github.com/maniacbug/RF24">[GitHub] maniacbug's RF24 library</a></li>
+<li><a href="http://arduino.cc/en/Guide/Libraries">[Arduino] Libraries</a></li>
+<li><a href="http://maniacbug.wordpress.com/2011/11/02/getting-started-rf24/">Getting Started with nRF24L01+ on Arduino</a></li>
+<li><a href="http://arduino-info.wikispaces.com/Nrf24L01-2.4GHz-HowTo">nRF24L01 2.4GHz Radio/Wireless Transceivers How-To</a></li>
+</ul>

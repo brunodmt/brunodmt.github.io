@@ -1,0 +1,23 @@
+---
+layout: post
+status: publish
+published: true
+title: Arduino MIDILed...
+date: '2013-02-17 01:37:57 -0300'
+date_gmt: '2013-02-17 01:37:57 -0300'
+categories:
+- Arduino
+tags: []
+comments: true
+---
+<p><strong>...o como controlar un LED RGB con un teclado MIDI y un Arduino.</strong></p>
+<p>Este sencillo proyecto, ideado por mi amigo Esteban Colcombet (<a href="https://twitter.com/quinont">@QuinoNT</a>), consiste en manipular LEDs mediante un Arduino en base a comandos enviados por un dispositivo MIDI, como un teclado o una bater&iacute;&shy;a electr&oacute;nica. As&iacute;&shy; para cada nota se prende un LED, cuya intensidad depende de la velocidad con que se presion&oacute; la tecla.</p>
+<p>Para este prototipo utilizamos un LED RGB ya que es lo que ten&iacute;amos a mano, sin embargo se puede utilizar un LED independiente para cada nota y con una simple modificaci&oacute;n del <em>sketch</em> es posible ampliar la cantidad de notas (limitadas en principio por la cantidad de salidas de nuestro Arduino).</p>
+<p>En mi caso tengo mi teclado no tiene la salida MIDI "tradicional" si no que funciona mediante USB. Utilizamos entonces un Arduino Mega ADK capaz de funcionar como USB Host. Para establecer la comunicaci&oacute;n entre el teclado y el Arduino nos hicimos de las librer&iacute;&shy;as<a href="http://www.circuitsathome.com"> USB Host Shield 2</a> para la utilizaci&oacute;n del USB y <a href="https://github.com/YuuichiAkagawa/USBH_MIDI">USBH MIDI</a> para la interacci&oacute;n MIDI. A partir de las mismas todo lo que tenemos que hacer es pedir los comandos MIDI en un buffer de 3 bytes y procesarlos. Los pasos detallados pueden encontrarlos en el <em>sketch</em> m&aacute;s abajo. En el caso de tener un dispositivo con el enchufe MIDI com&uacute;n la cosa es m&aacute;s sencilla. La <a href="http://playground.arduino.cc/Main/MIDILibrary">Arduino MIDI Library</a> trae facilidades como el uso de callbacks para los comandos NoteOn y NoteOff, que hacen m&aacute;s sencillo el procesamiento.</p>
+<p>Por si no entendieron en que consiste, un video de demostraci&oacute;n:</p>
+<p><iframe src="http://www.youtube.com/embed/Cn7vdLgAJrE?rel=0" height="315" width="560" allowfullscreen="" frameborder="0"></iframe></p>
+<p>Las conexiones necesarias son muy simples, simplemente cada LED conectado al pin de salida correspondiente mediante una resistencia de 10K.</p>
+<p><a href="/assets/arduino-rgb-led.png"><img class="wp-image-27 alignnone" alt="Esquema de Conexi&oacute;n" src="/assets/arduino-rgb-led.png" width="562" height="207" /></a></p>
+<p>Y para terminar, la parte m&aacute;s interesante <em>donde la magia ocurre</em>:</p>
+<p><script type="text/javascript" src="https://gist.github.com/brunodmt/4969611.js"></script></p>
+<p>Esta fue una breve introducci&oacute;n, si quieren m&aacute;s informaci&oacute;n o tienen alguna duda no duden en consultarnos!</p>

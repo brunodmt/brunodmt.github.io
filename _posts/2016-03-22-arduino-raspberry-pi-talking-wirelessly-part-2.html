@@ -1,0 +1,277 @@
+---
+layout: post
+status: publish
+published: true
+title: Arduino & Raspberry Pi talking wirelessly [Part 2]
+date: '2016-03-22 22:37:21 -0300'
+date_gmt: '2016-03-23 01:37:21 -0300'
+categories:
+- Arduino
+- Raspberry Pi
+tags:
+- Raspberry Pi
+- nRF24L01+
+- wireless
+- rf
+- communication
+- Raspberry Pi Arduino
+comments:
+- id: 5263
+  author: jaris sergis
+  author_email: tuvieja@entanguis.com
+  author_url: ''
+  date: '2016-03-22 23:19:47 -0300'
+  date_gmt: '2016-03-23 02:19:47 -0300'
+  content: aay what coolx2
+- id: 5424
+  author: HB
+  author_email: pmabres@gmail.com
+  author_url: ''
+  date: '2016-06-29 16:38:41 -0300'
+  date_gmt: '2016-06-29 19:38:41 -0300'
+  content: Great post, haven't seen something good like this one in ages.
+---
+<p>This is the second part of my <a href="{{ site.baseurl }}{% post_url 2013-11-30-arduino-raspberry-pi-talking-wirelessly %}">last post</a>. In case you haven't read it yet, I suggest you <a href="http://blog.brunodemartino.com.ar/2013/11/arduino-raspberry-pi-talking-wirelessly/">do it</a> before reading this one. If you aren't interested in the Arduino part, just read the introduction, the description of the modules and the SPI background. In this part I'll prepare de Raspberry Pi and test its communication with the Arduino.</p>
+<p><!--more--></p>
+<p><strong>Using the Rasbperry Pi from your computer</strong></p>
+<p>I'll be using a Raspberry Pi Model B with Raspbian. As I don't have an extra monitor and I don't want to be switching keyboards, I'll be using it from my PC through <em>ssh</em>. To do this you need a ssh client like <a href="http://www.chiark.greenend.org.uk/~sgtatham/putty/download.html">PuTTY</a> and your Raspberry Pi IP address. In case it has a static IP, you should already know it. In case it's using DHCP, you can check your router o search for a lan scanner software. Once you have the address all you have to do is put it in your client. When you are asked for user and password just use the same you use to log in to the Raspberry Pi (By default the user "pi" and the password "raspberry"). In case this is not working you may have an old Raspbian's image, you can search a solution for your specific image or just use a new one.</p>
+<p><strong>First step: Update</strong></p>
+<p>Before doing anything, you should update your Raspberry Pi with the latest packages. To do this you just have to execute this two commands:</p>
+<p>{% highlight bash %}sudo apt-get update
+sudo apt-get upgrade{% endhighlight %}</p>
+<p>In case you have no idea what they do, the first one updates de package list, while de second one updates your installed packages to the latest version.</p>
+<p><strong>Software SPI vs Hardware SPI</strong></p>
+<p>In my previous post I said that we were going to use SPI communication. As in any communication protocol, the SPI protocol defines many tasks needed to be done, as synchronization and timing. One way to implement this functions is called <a href="http://en.wikipedia.org/wiki/Bit-banging">bit banging</a> and means that they will be implemented on software. The states of the wires from the bus will be set and sampled by software directly, which will be responsible for all the parameters of the signal. The other way is to use dedicated hardware. This hardware will handle all the signaling, giving the software a higher level interface through the driver.</p>
+<p>Bit banging usually comes in handy when you don't have dedicated hardware and you can't incorporate it to your embeded system or you don't want to spend money. Although it has its disadvantages: it consumes a lot more CPU cycles (all the changes in the signals are made with CPU instructions) and it's usually less reliable, specially with high speeds.</p>
+<p>Why bother explaining this? The Raspberry Pi has a Broadcom BCM2835 SoC (System-on-a-Chip) which includes CPU, GPU and many peripherals, including hardware SPI. If you want to see the chip, you won't find it because it's under the RAM chip... well, you can see its sides. Unfortunately, Raspbian image usually comes with hardware SPI disabled (I'm not sure in the latest versions, but you could check) and most examples use bit-banging. So why would we want to use software SPI if we have hardware available? Let's enable it.</p>
+<p><strong>Enabling Hardware SPI</strong></p>
+<p>These are the steps that worked for me, but if you have a recent Raspbian image maybe you can't ignore the first ones. You may try from step 4 and if it's already working you may continue with the guide without the previous steps. If not you can try following the guide from step 2. If it works go on, if it doesn't do all the steps. If you aren't sure of what to do just follow the entire guide and there won't (there shouldn't) be a problem.</p>
+<p><strong>1.</strong> Get and run <a href="https://github.com/Hexxeh/rpi-update">rpi-update</a>. You can do it from GitHub or from the repositories. I did it from the repositories and all worked fine:</p>
+<p>{% highlight bash %}sudo apt-get install rpi-update{% endhighlight %}</p>
+<p>If you want to do it from GitHub follow this steps:</p>
+<p>{% highlight bash %}sudo apt-get install git
+sudo wget https://raw.github.com/Hexxeh/rpi-update/master/rpi-update -O /usr/bin/rpi-update &amp;&amp; sudo chmod +x /usr/bin/rpi-update{% endhighlight %}</p>
+<p>To run it, no matter how you installed:</p>
+<p>{% highlight bash %}sudo rpi-update{% endhighlight %}</p>
+<p>This will update your Raspberry Pi firmware, it make take a while but you usually won't have problems with it.</p>
+<p><strong>2. </strong>Enable the SPI driver by using raspi-config</p>
+<p>{% highlight bash %}sudo raspi-config{% endhighlight %}</p>
+<p>On the menu go to <em>9. Advanced Options</em> and then <em>A6 SPI</em>. When the confirmation dialog asks you if you want to enable the SPI interface select <em>Yes</em> (really). When it asks you if you want the module to be loaded by default select <em>Yes</em> again.{% highlight c %}{% endhighlight %}</p>
+<p>You may also need to remove the driver from the blacklist. To do it open the file <em>/etc/modprobe.d/raspi-blacklist.conf</em> as root with your favourite editor (if you are unsure, use <em>nano</em>):</p>
+<p>{% highlight bash %}sudo nano /etc/modprobe.d/raspi-blacklist.conf{% endhighlight %}</p>
+<p>and add a <em>#</em> before <em>spi-bcm2708</em>, like this:</p>
+<p>{% highlight bash %}#spi-bcm2708{% endhighlight %}</p>
+<p>If the file doesn't exist don't worry, you are OK.</p>
+<p><strong>3. </strong>Reboot by selecting Yes when raspi-config asks you, or on the console with:</p>
+<p>{% highlight bash %}sudo reboot now{% endhighlight %}</p>
+<p><strong>4.</strong> Check if the driver is loaded. For that go to your <em>/dev</em> folder and check if the SPI devices are there (<em>spidev0.0</em> and <em>spidev0.1</em>). You can do this running:</p>
+<p>{% highlight bash %}ls /dev | grep spidev{% endhighlight %}</p>
+<p>and you should get both lines.</p>
+<p>{% highlight bash %}spidev0.0
+spidev0.1{% endhighlight %}</p>
+<p><strong>5.</strong> Check the SPI bus by connecting the MISO and MOSI pins (we'll make a loopback) with a cable and running the following test:</p>
+<p>{% highlight bash %}wget https://raw.githubusercontent.com/raspberrypi/linux/rpi-3.10.y/Documentation/spi/spidev_test.c
+gcc -o spidev_test spidev_test.c
+./spidev_test -D /dev/spidev0.0{% endhighlight %}</p>
+<p>The output should be something like:</p>
+<p>{% highlight bash %}spi mode: 0
+bits per word: 8<
+max speed: 500000 Hz (500 KHz)
+FF FF FF FF FF FF
+40 00 00 00 00 95
+FF FF FF FF FF FF
+FF FF FF FF FF FF
+FF FF FF FF FF FF
+DE AD BE EF BA AD
+F0 0D{% endhighlight %}</p>
+<p><strong> Connecting the module to the Raspberry Pi</strong></p>
+<p>This step is similar to the Arduino one, just connecting the module pins to the right RaspberryPi pins. Having a breakout board or at least a cable for the Raspberry Pi IO pings makes this step a lot easier. The connections are:</p>
+<table border="1" cellspacing="0" cellpadding="0">
+<tbody>
+<tr>
+<td valign="top" width="110">
+<p align="center"><b>nRF24L01+ Pin</b></p>
+</td>
+<td valign="top" width="92">
+<p align="center"><b>Line</b></p>
+</td>
+<td valign="top" width="94">
+<p align="center"><b>Raspberry Pi Pin<br />
+</b></p>
+</td>
+<td valign="top" width="94">
+<p align="center"><b>Wire Color (Just for reference)<br />
+</b></p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">1</p>
+</td>
+<td valign="top" width="92">
+<p align="center">GND</p>
+</td>
+<td valign="top" width="94">
+<p align="center">GND</p>
+</td>
+<td valign="top" width="94">
+<p style="background: black; color: white;" align="center">Black</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">2</p>
+</td>
+<td valign="top" width="92">
+<p align="center">3V3</p>
+</td>
+<td valign="top" width="94">
+<p align="center">3V3</p>
+</td>
+<td valign="top" width="94">
+<p style="background: red; color: white;" align="center">Red</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">3</p>
+</td>
+<td valign="top" width="92">
+<p align="center">CE</p>
+</td>
+<td valign="top" width="94">
+<p align="center">GPIO22</p>
+</td>
+<td valign="top" width="94">
+<p style="background: yellow; color: black;" align="center">Yellow</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">4</p>
+</td>
+<td valign="top" width="92">
+<p align="center">CSN (SPI)</p>
+</td>
+<td valign="top" width="94">
+<p align="center">CS0</p>
+</td>
+<td valign="top" width="94">
+<p style="background: blue; color: white;" align="center">Blue</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">5</p>
+</td>
+<td valign="top" width="92">
+<p align="center">SCK (SPI)</p>
+</td>
+<td valign="top" width="94">
+<p align="center">SCLK</p>
+</td>
+<td valign="top" width="94">
+<p style="background: brown; color: white;" align="center">Brown</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">6</p>
+</td>
+<td valign="top" width="92">
+<p align="center">MOSI (SPI)</p>
+</td>
+<td valign="top" width="94">
+<p align="center">MOSI</p>
+</td>
+<td valign="top" width="94">
+<p style="background: green; color: white;" align="center">Green</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">7</p>
+</td>
+<td valign="top" width="92">
+<p align="center">MISO (SPI)</p>
+</td>
+<td valign="top" width="94">
+<p align="center">MISO</p>
+</td>
+<td valign="top" width="94">
+<p style="color: black;" align="center">White</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">8</p>
+</td>
+<td valign="top" width="92">
+<p align="center">Interrupt</p>
+</td>
+<td valign="top" width="94">
+<p align="center">-</p>
+</td>
+<td>
+<p align="center">-</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>I'm not including the mapping to physical pin numbers since they change between Raspberry Pi versions, so search them with the model you are using.</p>
+<p><strong>Getting the library</strong></p>
+<p>On the software side we'll be using the same library as on the Arduino. First you need to install Git if you don't have it yet:</p>
+<p>{% highlight bash %}sudo apt-get install git{% endhighlight %}</p>
+<p>Then follow the instructions on the official <a href="http://tmrh20.github.io/RF24/RPi.html">docs</a> to get the library and run the example. I'm replicating here the manual instal instructions which are the ones I followed:</p>
+<p>1. Make a directory to contain the RF24 and possibly RF24Network lib and enter it:</p>
+<p>{% highlight bash %}mkdir ~/rf24libs
+cd ~/rf24libs{% endhighlight %}</p>
+<p>2. Clone the RF24 repo:</p>
+<p>{% highlight bash %}git clone https://github.com/tmrh20/RF24.git RF24{% endhighlight %}</p>
+<p>3. Change to the new RF24 directory</p>
+<p>{% highlight bash %}cd RF24{% endhighlight %}</p>
+<p>4. Build the library, and run an example file:</p>
+<p>{% highlight bash %}sudo make install
+cd examples_RPi
+make
+sudo ./gettingstarted{% endhighlight %}</p>
+<p>If everything went ok you should get something like (again if you get all zeroes something is wrong):</p>
+<p>{% highlight bash %}RF24/examples/GettingStarted/
+================ SPI Configuration ================
+CSN Pin = CE0 (PI Hardware Driven)
+CE Pin = Custom GPIO22
+Clock Speed = 8 Mhz
+================ NRF Configuration ================
+STATUS = 0x0e RX_DR=0 TX_DS=0 MAX_RT=0 RX_P_NO=7 TX_FULL=0
+RX_ADDR_P0-1 = 0x65646f4e32 0x65646f4e31
+RX_ADDR_P2-5 = 0xc3 0xc4 0xc5 0xc6
+TX_ADDR = 0x65646f4e32
+RX_PW_P0-6 = 0x20 0x20 0x00 0x00 0x00 0x00
+EN_AA = 0x3f
+EN_RXADDR = 0x02
+RF_CH = 0x4c
+RF_SETUP = 0x07
+CONFIG = 0x0e
+DYNPD/FEATURE = 0x00 0x00
+Data Rate = 1MBPS
+Model = nRF24L01+
+CRC Length = 16 bits
+PA Power = PA_MAX
+************ Role Setup ***********
+Choose a role: Enter 0 for pong_back, 1 for ping_out (CTRL+C to exit){% endhighlight %}</p>
+<p><strong>The Final Test</strong></p>
+<p>So everything seems to be working but... is it? Plug in your Arduino, run the same sketch from the previous post and open the serial monitor. By default the Arduino example works as a receiver until you toggle it, so we will leave it like that for now. Now plug in your Raspberry Pi and run the same example as before, when it asks you to choose a role enter 1 for ping_out (transmitter).<br />
+You should start getting on the Raspberry Pi shell messages like:</p>
+<p>{% highlight bash %}Now sending...
+Got response 624553, round-trip delay: 2{% endhighlight %}</p>
+<p>And messages like:</p>
+<p>{% highlight bash %}Sent response 624553{% endhighlight %}</p>
+<p>on the Arduino Serial Monitor.<br />
+With this example the Raspberry Pi is emitting messages, the Arduino receives them and answers them.</p>
+<p>To test the communication in the other way, stop the Raspberry Pi test (Ctrl+C) and run it again, but this time select 0 for pong_back. The on the Arduino shell send a T to swith to transmitter. Instantly the Arduino should start showing messages like:</p>
+<p>{% highlight bash %}Now sending
+Sent 341998704, Got response 341998704, Round-trip delay 1724 microseconds{% endhighlight %}</p>
+<p>And the Raspberry Pi messages like:</p>
+<p>{% highlight bash %}Got payload(4) 341998704...{% endhighlight %}</p>
+<p>With this, you've got your to boards communicating. Now you should explore the library <a href="http://tmrh20.github.io/RF24/index.html">docs</a> and the <a href="https://github.com/TMRh20/RF24/tree/master/examples">examples</a> to find how to send and receive your own data. If you are feeling adventurous you can even check how to make more complex networks with many devices or things like that.</p>
+<p>I hope you liked the post (and sorry for the delay between the two parts). I'll try to keep this blog more up to date.</p>

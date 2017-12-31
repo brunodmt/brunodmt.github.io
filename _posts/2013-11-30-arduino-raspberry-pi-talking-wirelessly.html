@@ -1,0 +1,292 @@
+---
+layout: post
+status: publish
+published: true
+title: "Arduino & Raspberry Pi talking wirelessly [Part 1]"
+date: '2013-11-30 19:08:06 -0300'
+date_gmt: '2013-11-30 22:08:06 -0300'
+categories:
+- Arduino
+- Raspberry Pi
+tags:
+- Arduino
+- Raspberry Pi
+- nRF24L01+
+- wireless
+- rf
+- communication
+comments:
+- id: 5137
+  author: Erwan
+  author_email: erwan@failbone.com
+  author_url: ''
+  date: '2016-01-28 01:59:46 -0300'
+  date_gmt: '2016-01-28 04:59:46 -0300'
+  content: Dude you should finish this and post part 2
+- id: 5261
+  author: bdemartino
+  author_email: demartinoba@gmail.com
+  author_url: http://blog.brunodemartino.com.ar
+  date: '2016-03-22 22:40:34 -0300'
+  date_gmt: '2016-03-23 01:40:34 -0300'
+  content: Thanks for the comment! Here is part 2 http://blog.brunodemartino.com.ar/2016/03/arduino-raspberry-pi-talking-wirelessly-part-2/
+    (and this part has been updated).
+- id: 5262
+  author: Arduino &#038; Raspberry Pi talking wirelessly [Part 2] | Bruno Demartino
+  author_email: ''
+  author_url: http://blog.brunodemartino.com.ar/2016/03/arduino-raspberry-pi-talking-wirelessly-part-2/
+  date: '2016-03-22 22:41:41 -0300'
+  date_gmt: '2016-03-23 01:41:41 -0300'
+  content: "[&#8230;] is the second part of my last post. In case you haven&#8217;t
+    read it yet, I suggest you do it before reading this one. If you [&#8230;]"
+---
+<p>In this guide I'll be explaining how to communicate an Arduino and a Raspberry Pi with nRF24L01+ modules. I found many guides to accomplish this around the Internet, but none of them was complete or fully worked for me, so I decided to log what I've done for future reference. Part 1 has an introduction and an explanation of how to prepare the Arduino, while in the second part I'll prepare the Raspberry Pi and test everything.</p>
+<p><strong>nRF24L01+</strong></p>
+<p>The modules I'll be using are, as I mentioned, based on the <a href="http://www.nordicsemi.com/eng/Products/2.4GHz-RF/nRF24L01P">nRF24L01+</a> chip from Nordic Semiconductors. The reason to choose them over other alternatives is that while being cheap they do have many useful features not found on the cheapest modules, such as many pipelines, buffers and auto-retransmit. In this case one of the modules is a normal one (the one in the left), while the other has LNA and PA (Low noise amplifier and Power amplifier) circuits for improved range (the one in the right). Both are from <a href="http://blog.iteadstudio.com/">Itead Studio</a>.</p>
+
+<p><figure>
+<a href="/assets/Modules.png"><img class="size-large wp-image-95" alt="nRF24L01+" src="/assets/Modules.png" /></a>
+<figcaption>nRF24L01+ module (left) and nRF24L01+ with PA and LNA module (right)</figcaption>
+</figure></p>
+<p><strong>SPI background</strong></p>
+<p>To interact with these modules we have to use the <a href="http://en.wikipedia.org/wiki/Serial_Peripheral_Interface">SPI</a> bus. SPI is a serial interface as the name suggets (Serial Peripheral Interface) which works in a master/slave setup. The SPI bus can operate with a single master device and one or more slave devices. It uses three common wires and one extra wire per slave device. The three common wires (connected to all the devices) are:</p>
+<ul>
+<li>SCK: serial clock (output from master)</li>
+<li>MOSI: master output - slave input (output from master)</li>
+<li>MISO: master input - slave output (output from slave)</li>
+</ul>
+<p>The extra wire is called SS (slave select) or CS (chip select) and its function is to enable the slave device we want to talk (only one slave can be enabled at the same time). If you want to know more about SPI and how it works you can always go to <a href="http://en.wikipedia.org/wiki/Serial_Peripheral_Interface">Wikipedia</a>. In this case we'll be using only one slave, but a you can see a common layout with multiple slaves in the following picture.</p>
+<p><figure>
+<a href="/assets/363px-SPI_three_slaves.svg_.png"><img class="size-full wp-image-97" alt="Typical SPI bus: master and three independent slaves. [Wikipedia]" src="/assets/363px-SPI_three_slaves.svg_.png" width="363" height="288" /></a>
+<figcaption>Typical SPI bus: master and three independent slaves. [Wikipedia]</figcaption>
+</figure></p>
+<p>We'll begin preparing the Arduino because it's the easieast part. This instructions are for the Arduino ADK (they also work with the Arduino Mega 2560). You can use any Arduino, but keep it mind that the connections usually vary. If you search your Arduino model on the web you will find which pins you have to use for SPI. In the following table you will find the needed connections.</p>
+<table border="1" cellspacing="0" cellpadding="0">
+<tbody>
+<tr>
+<td valign="top" width="110">
+<p align="center"><b>nRF24L01+ Pin</b></p>
+</td>
+<td valign="top" width="92">
+<p align="center"><b>Line</b></p>
+</td>
+<td valign="top" width="94">
+<p align="center"><b>Arduino Pin</b></p>
+</td>
+<td valign="top" width="94">
+<p align="center"><b>Wire Color (Just for reference)<br />
+</b></p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">1</p>
+</td>
+<td valign="top" width="92">
+<p align="center">GND</p>
+</td>
+<td valign="top" width="94">
+<p align="center">GND</p>
+</td>
+<td valign="top" width="94">
+<p style="background: black; color: white;" align="center">Black</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">2</p>
+</td>
+<td valign="top" width="92">
+<p align="center">3V3</p>
+</td>
+<td valign="top" width="94">
+<p align="center">3V3</p>
+</td>
+<td valign="top" width="94">
+<p style="background: red; color: white;" align="center">Red</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">3</p>
+</td>
+<td valign="top" width="92">
+<p align="center">CE</p>
+</td>
+<td valign="top" width="94">
+<p align="center">9</p>
+</td>
+<td valign="top" width="94">
+<p style="background: yellow; color: black;" align="center">Yellow</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">4</p>
+</td>
+<td valign="top" width="92">
+<p align="center">CSN (SPI)</p>
+</td>
+<td valign="top" width="94">
+<p align="center">10</p>
+</td>
+<td valign="top" width="94">
+<p style="background: blue; color: white;" align="center">Blue</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">5</p>
+</td>
+<td valign="top" width="92">
+<p align="center">SCK (SPI)</p>
+</td>
+<td valign="top" width="94">
+<p align="center">52 (SCK)</p>
+</td>
+<td valign="top" width="94">
+<p style="background: brown; color: white;" align="center">Brown</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">6</p>
+</td>
+<td valign="top" width="92">
+<p align="center">MOSI (SPI)</p>
+</td>
+<td valign="top" width="94">
+<p align="center">51 (MOSI)</p>
+</td>
+<td valign="top" width="94">
+<p style="background: green; color: white;" align="center">Green</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">7</p>
+</td>
+<td valign="top" width="92">
+<p align="center">MISO (SPI)</p>
+</td>
+<td valign="top" width="94">
+<p align="center">50 (MISO)</p>
+</td>
+<td valign="top" width="94">
+<p style="color: black;" align="center">White</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="110">
+<p align="center">8</p>
+</td>
+<td valign="top" width="92">
+<p align="center">Interrupt</p>
+</td>
+<td valign="top" width="94">
+<p align="center">-</p>
+</td>
+<td>
+<p align="center">-</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>You should notice a few things:</p>
+<ul>
+<li>The module works with 3.3V, so you have to connected to that line and NOT to the 5V line</li>
+<li>The module uses an extra "data" wire besides the SPI ones (CE: Chip Enable)</li>
+<li>The library doesn't use the SS Arduino pin, but a regular digital pin as SS</li>
+<li>Both of this connections (CE and SS) are defined when initializing the library and can be changed</li>
+<li>The SCK, MOSI and MISO connections are the "Arduino dependant" and we'll be in another pins if you're using a different Arduino</li>
+<li>The module's 8th pin is for interrupts and it's not currently used by the library</li>
+</ul>
+<p>I made an image in Fritzing in case it is easier for you to see the connections graphically:</p>
+<p><figure>
+<a href="/assets/connections.png"><img class="size-large wp-image-104" alt="Arduino - nRF24L01+ Connections" src="/assets/connections.png" /></a>
+<figcaption>Arduino - nRF24L01+ Connections (Not in scale)</figcaption>
+</figure></p>
+<p>If you plan to use a breadboard you will need to make an adapter (if you have a common breadboard, there's no way to put the module directly without shorting its pins)</p>
+<p><strong>Programming stage</strong></p>
+<p><del>So everything it's ready and it's time to program the Arduino. There are many libraries to use this modules, the one I used it's <a href="https://github.com/maniacbug/RF24">RF24</a> from <a href="http://maniacbug.wordpress.com/">maniacbug</a>. If you explore the <a href="https://github.com/maniacbug/RF24/network">network </a>of this repository you will find there're a lot of forks, but I couldn't find any relevant difference (not that I spent much time searching). As any Arduino library, just clone the repo from Github or download the <a href="https://github.com/maniacbug/RF24/archive/master.zip">zip</a> file and install it. If like me, you downloaded the zip version of the Arduino IDE, just unzip the RF24-master folder (the one inside the zip, not the zip itself) in the "libraries" folder from your IDE and rename to RF24. In any other case, or if that doesn't work,&nbsp;<a title="Installing additional Arduino Libraries" href="http://arduino.cc/en/Guide/Libraries">here</a> are more detailed instructions.</del></p>
+<p><del>So everything is ready, just open your Arduino IDE and go to <strong>File</strong> > <strong>Examples</strong> > <strong>RF24</strong> > <strong>pingpair</strong> and load it to your Arduino. If you read a little the sketch, you will have noticed that the pin 7 will control the role of the Arduino. If it is left disconnected the Arduino enters the "pong back" role, in which it'll wait for a message and send it back when received. If the pin is connected to ground, the Arduino will enter the "ping out" role, in which it'll constantly send packets and wait for their confirmation. Keep in mind that the Arduino won't change the role while running, you will have to reset it if you change the pin state.</del></p>
+<p>So everything is ready and it's time to program the Arduino. When I first wrote this post I used the <a href="https://github.com/maniacbug/RF24">RF24</a> library from <a href="http://maniacbug.wordpress.com/">maniacbug</a> but it hasn't been updated for a few years so I'll be using a more updated fork from <a href="http://tmrh20.blogspot.com.ar/">TMRh20</a>, which can be found in <a href="https://github.com/TMRh20/RF24">GitHub</a>. As of today the library can be installed directly from the Arduino IDE. Just go to <em>Sketch > Include library > Manage Libraries...</em>, search for <strong>RF24</strong> and install it.</p>
+<p>Next we'll check if the communication with the module works ok (the SPI bus, not the RF communication with another module). To do it we'll use the Getting Started example from the library with some modifications. Open it (<em>File > Examples > RF24 > GettingStarted</em>) and then (a) add</p>
+<p>
+{% highlight c %}
+#include <printf.h>
+{% endhighlight %}
+</p>
+<p>on the includes block;</p>
+<p>(b) change</p>
+<p>{% highlight c %}/* Hardware configuration: Set up nRF24L01 radio on SPI bus plus pins 7 & 8 */
+RF24 radio(7,8);{% endhighlight %}
+</p>
+<p>for
+{% highlight c %}/* Hardware configuration: Set up nRF24L01 radio on SPI bus plus pins 7 & 8 */
+RF24 radio(9,10);{% endhighlight %}</p>
+<p>(c) add</p>
+<p>{% highlight c %}printf_begin();{% endhighlight %}</p>
+<p>after <em>Serial.begin(115200);</em> on the <strong>setup</strong> method;</p>
+<p>(d) and add</p>
+<p>{% highlight c %}radio.printDetails();{% endhighlight %}</p>
+<p>just before</p>
+<p>{% highlight c %}// Start the radio listening for data
+radio.startListening();{% endhighlight %}</p>
+<p>at the end of the <strong>setup</strong> method.</p>
+<p>Upload the code and open the Serial Monitor on the Arduino IDE (or any serial terminal you like) and set it to 115200 bauds. You should get something like this:</p>
+<p>
+{% highlight bash %}
+RF24/examples/GettingStarted
+*** PRESS 'T' to begin transmitting to the other node
+STATUS = 0x0e RX_DR=0 TX_DS=0 MAX_RT=0 RX_P_NO=7 TX_FULL=0
+RX_ADDR_P0-1 = 0x65646f4e31 0x65646f4e32
+RX_ADDR_P2-5 = 0xc3 0xc4 0xc5 0xc6
+TX_ADDR = 0x65646f4e31
+RX_PW_P0-6 = 0x20 0x20 0x00 0x00 0x00 0x00
+EN_AA = 0x3f
+EN_RXADDR = 0x02
+RF_CH = 0x4c
+RF_SETUP = 0x03
+CONFIG = 0x0e
+DYNPD/FEATURE = 0x00 0x00
+Data Rate = 1MBPS
+Model = nRF24L01+
+CRC Length = 16 bits
+PA Power = PA_LOW
+{% endhighlight %}
+</p>
+<p>If instead all you get are zeros then you have something wired wrong or your module it's not working properly (it will usually be the former). If this happens check that everything is wired correctly and retry.<br />
+{% highlight bash %}
+RF24/examples/GettingStarted
+*** PRESS 'T' to begin transmitting to the other node
+STATUS = 0x00 RX_DR=0 TX_DS=0 MAX_RT=0 RX_P_NO=0 TX_FULL=0
+RX_ADDR_P0-1 = 0x0000000000 0x0000000000
+RX_ADDR_P2-5 = 0x00 0x00 0x00 0x00
+TX_ADDR = 0x0000000000
+RX_PW_P0-6 = 0x00 0x00 0x00 0x00 0x00 0x00
+EN_AA = 0x00
+EN_RXADDR = 0x00
+RF_CH = 0x00
+RF_SETUP = 0x00
+CONFIG = 0x00
+DYNPD/FEATURE = 0x00 0x00
+Data Rate = 1MBPS
+Model = nRF24L01
+CRC Length = Disabled
+PA Power = PA_MIN
+{% endhighlight %}
+<br />
+Once the module is answering ok, we're ready to test the rf communications. Well, there's a problem, we just prepared one device, the other one will be the Raspberry Pi which we'll be configuring in the next part, so we'll have to wait until then to test the communication between the modules. If you have another Arduino and you can't wait you can repeat the process for the other one, put one in each role and test them.</p>
+<p>Anyway, be ready for the next post since the configuration of the Raspberry Pi is a little more complex. To conclude, some useful links (some are already in the post, others are new):</p>
+<ul>
+<li><a href="http://www.nordicsemi.com/eng/Products/2.4GHz-RF/nRF24L01P">nRF24L01+ Product Page</a></li>
+<li><a href="http://imall.iteadstudio.com/wireless/im120606002.html">Itead Studio's nRF24Lo1 Module</a></li>
+<li><a href="http://imall.iteadstudio.com/wireless/im120606003.html">Itead Studio's nRF24Lo1 with PA and LNA Module</a></li>
+<li><a href="http://en.wikipedia.org/wiki/Serial_Peripheral_Interface">[Wikipedia] SPI Bus</a></li>
+<li><a href="https://github.com/maniacbug/RF24">[GitHub] maniacbug's RF24 library</a></li>
+<li><a href="http://arduino.cc/en/Guide/Libraries">[Arduino] Libraries</a></li>
+<li><a href="http://maniacbug.wordpress.com/2011/11/02/getting-started-rf24/">Getting Started with nRF24L01+ on Arduino</a></li>
+<li><a href="http://arduino-info.wikispaces.com/Nrf24L01-2.4GHz-HowTo">nRF24L01 2.4GHz Radio/Wireless Transceivers How-To</a></li>
+<li><a href="http://tmrh20.github.io/RF24/index.html">TMRh20s's RF24 library</a></li>
+</ul>
