@@ -41,7 +41,7 @@ use uinput::event::Event::Absolute;
 use uinput::event::Event::Controller;
 ```
 
-We'll also import som rust std names to add delays between each input event:
+We'll also import some rust std names to add delays between each input event:
 ```rust
 use std::thread;
 use std::time::Duration;
@@ -127,7 +127,7 @@ First, get the required dependencies from the Android SDK, you can do it by goin
 
 Once everything is installed the SDK and NDK paths have to be defined as environment variables, for example:
 ```bash
-export ANDROID_HOME=/home/$USER/Android/sdk
+export ANDROID_HOME=/home/$USER/Android/Sdk
 export NDK_HOME=$ANDROID_HOME/ndk-bundle
 ```
 
@@ -146,7 +146,7 @@ ar = "<project path>/NDK/arm/bin/arm-linux-androideabi-ar"
 linker = "<project path>/NDK/arm/bin/arm-linux-androideabi-clang"
 ```
 
-Replacing `<project path>` with your project's patch. Again, if you want to use different architectures you can do it here adapting the sample configuration.
+Replacing `<project path>` with your project's absolute path. Again, if you want to use different architectures you can do it here adapting the sample configuration.
 
 Then, install the config file doing:
 ```bash
