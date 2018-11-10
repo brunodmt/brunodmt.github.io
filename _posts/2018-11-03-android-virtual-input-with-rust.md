@@ -207,9 +207,55 @@ version = "0.1.3"
 default-features = false
 ```
 
-# Cross-compile, attempt 2
+# Cross-compiling, attempt 2
 
-Let's run the build again:
+Trying to build again:
+```bash
+$ cargo build --target armv7-linux-androideabi --release
+```
+ we still get an error:
+ ```bash
+   Compiling ioctl-sys v0.5.2
+   Compiling bytes v0.4.10
+error[E0432]: unresolved import `platform_not_supported`
+  --> /home/bdemartino/.cargo/registry/src/github.com-1ecc6299db9ec823/ioctl-sys-0.5.2/src/lib.rs:16:5
+   |
+16 | use platform_not_supported;
+   |     ^^^^^^^^^^^^^^^^^^^^^^ no `platform_not_supported` in the root
+
+error: aborting due to previous error
+
+For more information about this error, try `rustc --explain E0432`.
+error: Could not compile `ioctl-sys`.
+warning: build failed, waiting for other jobs to finish...
+error: build failed
+```
+This time is when trying to compile the `ioctl-sys` crate.
+
+If we go to the conflicting file [lib.rs](https://github.com/jmesmon/ioctl/blob/master/ioctl-sys/src/lib.rs) in the `ioctl-sys` crate's repository we can see that it only supports **linux** and **macos**, while our **android** target will try to use `platform_not_supported` and error out. Since `ioctl` in Android is common to Linux, the fix is simple: we only need to add **android** as `target_os` in the crate wherever **linux** is used. For example `lib.rs` would look like:
+```rust
+use std::os::raw::{c_int, c_ulong};
+
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "android"))]
+#[macro_use]
+mod platform;
+
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "android"))]
+pub use platform::*;
+
+extern "C" {
+    #[doc(hidden)]
+    pub fn ioctl(fd: c_int, req: c_ulong, ...) -> c_int;
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "android")))]
+use platform_not_supported;
+```
+The *hard* part is getting that change in our build. You can find how to do it in my [Overriding depencencies in rust]({% post_url 2018-11-10-overriding-dependencies-in-rust %}) post.
+
+# Cross-compiling, attempt 3
+
+Assuming you have fixed the error in the last step by following the [other post]({% post_url 2018-11-10-overriding-dependencies-in-rust %}), let's run the build again:
 ```bash
 $ cargo build --target armv7-linux-androideabi --release
 ```
