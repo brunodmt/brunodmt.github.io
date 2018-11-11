@@ -230,28 +230,7 @@ error: Could not compile `ioctl-sys`.
 warning: build failed, waiting for other jobs to finish...
 error: build failed
 ```
-This time is when trying to compile the `ioctl-sys` crate.
-
-If we go to the conflicting file [lib.rs](https://github.com/jmesmon/ioctl/blob/master/ioctl-sys/src/lib.rs) in the `ioctl-sys` crate's repository we can see that it only supports **linux** and **macos**, while our **android** target will try to use `platform_not_supported` and error out. Since `ioctl` in Android is common to Linux, the fix is simple: we only need to add **android** as `target_os` in the crate wherever **linux** is used. For example `lib.rs` would look like:
-```rust
-use std::os::raw::{c_int, c_ulong};
-
-#[cfg(any(target_os = "linux", target_os = "macos", target_os = "android"))]
-#[macro_use]
-mod platform;
-
-#[cfg(any(target_os = "linux", target_os = "macos", target_os = "android"))]
-pub use platform::*;
-
-extern "C" {
-    #[doc(hidden)]
-    pub fn ioctl(fd: c_int, req: c_ulong, ...) -> c_int;
-}
-
-#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "android")))]
-use platform_not_supported;
-```
-The *hard* part is getting that change in our build. You can find how to do it in my [Overriding depencencies in rust]({% post_url 2018-11-10-overriding-dependencies-in-rust %}) post.
+This time is when trying to compile the `ioctl-sys` crate. Since I've found this issue interesting to solve, I have split the solution to a separate post: [Overriding depencencies in rust]({% post_url 2018-11-10-overriding-dependencies-in-rust %}). You'll need to apply that fix before following with this guide.
 
 # Cross-compiling, attempt 3
 
