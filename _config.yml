@@ -20,9 +20,10 @@ github_username:  brunodmt
 
 # Build settings
 markdown: kramdown
-theme: minima
+remote_theme: jekyll/minima
 plugins:
   - jekyll-feed
+  - jekyll-remote-theme
   - jekyll-sitemap
 
 # Disqus Comments
